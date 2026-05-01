@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BGI London — Inventory Tracker</title>
+
+<!-- Supabase JS (browser CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+<!-- React & Babel -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg:      #0f1117;
+    --surface: #181c27;
+    --surface2:#1f2535;
+    --border:  #2a3045;
+    --accent:  #4f8ef7;
+    --accent2: #38d9a9;
+    --warn:    #f7a34f;
+    --danger:  #f75f5f;
+    --text:    #e8eaf0;
+    --text2:   #8b93a8;
+    --text3:   #565e74;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .mono { font-family: 'DM Mono', monospace; }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @keyframes fadeIn  { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes spin    { from { transform:rotate(0deg); }  to { transform:rotate(360deg); } }
+  @keyframes slideDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes shake   { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
+
+  .fade-in    { animation: fadeIn .25s ease forwards; }
+  .slide-down { animation: slideDown .2s ease forwards; }
+  .spin-anim  { animation: spin 1s linear infinite; }
+  .shake      { animation: shake .4s ease; }
+
+  .pin-dot {
+    width:14px; height:14px; border-radius:50%;
+    border:2px solid var(--border); transition:all .15s;
+  }
+  .pin-dot.filled { background:var(--accent); border-color:var(--accent); box-shadow:0 0 8px rgba(79,142,247,.5); }
+
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:14px; }
+
+  .inp {
+    background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+    color:var(--text); padding:10px 14px;
+    font-family:'DM Sans',sans-serif; font-size:14px; width:100%; outline:none;
+    transition:border-color .15s;
+  }
+  .inp:focus { border-color:var(--accent); }
+  .inp::placeholder { color:var(--text3); }
+
+  select.inp {
+    appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b93a8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 12px center; padding-right:36px;
+  }
+
+  .btn {
+    border:none; border-radius:8px; padding:10px 18px;
+    font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500;
+    cursor:pointer; transition:all .15s;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .btn:active { transform:scale(.97); }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .btn-primary { background:var(--accent); color:#fff; }
+  .btn-primary:hover:not(:disabled) { background:#6a9ff8; }
+  .btn-success { background:var(--accent2); color:#0f1117; }
+  .btn-success:hover:not(:disabled) { filter:brightness(1.1); }
+  .btn-warn    { background:var(--warn); color:#0f1117; }
+  .btn-danger  { background:var(--danger); color:#fff; }
+  .btn-danger:hover:not(:disabled) { filter:brightness(1.1); }
+  .btn-ghost   { background:transparent; color:var(--text2); border:1px solid var(--border); }
+  .btn-ghost:hover:not(:disabled) { background:var(--surface2); color:var(--text); }
+
+  .badge { font-size:11px; font-weight:600; padding:3px 8px; border-radius:20px; font-family:'DM Mono',monospace; }
+  .badge-green  { background:rgba(56,217,169,.15); color:var(--accent2); }
+  .badge-blue   { background:rgba(79,142,247,.15);  color:var(--accent); }
+  .badge-warn   { background:rgba(247,163,79,.15);  color:var(--warn); }
+  .badge-danger { background:rgba(247,95,95,.15);   color:var(--danger); }
+
+  .overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,.7); backdrop-filter:blur(4px);
+    z-index:50; display:flex; align-items:center; justify-content:center; padding:16px;
+  }
+  .modal {
+    background:var(--surface); border:1px solid var(--border); border-radius:18px;
+    width:100%; max-width:420px; animation:fadeIn .2s ease;
+  }
+
+  .header-stripe { background:linear-gradient(135deg,#1a2240 0%,#151929 100%); border-bottom:1px solid var(--border); }
+
+  .inv-bar { height:3px; border-radius:2px; background:var(--border); overflow:hidden; }
+  .inv-bar-fill { height:100%; border-radius:2px; transition:width .4s ease; }
+
+  .toast-wrap {
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    z-index:999; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none;
+  }
+  .toast {
+    padding:10px 20px; border-radius:30px; font-size:13px; font-weight:500;
+    animation:fadeIn .2s ease; pointer-events:none; white-space:nowrap;
+  }
+  .toast-ok   { background:var(--accent2); color:#0f1117; }
+  .toast-err  { background:var(--danger);  color:#fff; }
+  .toast-info { background:var(--accent);  color:#fff; }
+
+  .numpad { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; max-width:220px; margin:0 auto; }
+  .numpad-btn {
+    aspect-ratio:1; border-radius:12px; border:1px solid var(--border); background:var(--surface2);
+    color:var(--text); font-size:20px; font-family:'DM Mono',monospace; cursor:pointer;
+    transition:all .1s; display:flex; align-items:center; justify-content:center;
+  }
+  .numpad-btn:hover { background:var(--border); }
+  .numpad-btn:active { transform:scale(.93); }
+
+  .tbl { width:100%; border-collapse:collapse; font-size:13px; }
+  .tbl th {
+    text-align:left; padding:10px 12px; color:var(--text3); font-weight:500;
+    font-size:11px; text-transform:uppercase; letter-spacing:.06em; border-bottom:1px solid var(--border);
+  }
+  .tbl td { padding:10px 12px; border-bottom:1px solid rgba(42,48,69,.5); color:var(--text2); }
+  .tbl tr:last-child td { border-bottom:none; }
+  .tbl tr:hover td { background:rgba(255,255,255,.02); }
+
+  .tab-nav-btn {
+    padding:8px 18px; background:transparent; border:none; cursor:pointer;
+    font-family:'DM Sans',sans-serif; font-size:14px; transition:all .15s;
+    border-bottom:2px solid transparent;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+// ─── Supabase Config ─────────────────────────────────────────────────────────
+const SUPABASE_URL = "https://gwrhpiecxrjmjkjhpeyb.supabase.co";
+const SUPABASE_KEY = "sb_publishable_gdsLz3mN0Z15o0e55jg3VA_mFqmZ4j0";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const MASTER_PIN = "1234";
+
+// ─── SVG Icons ───────────────────────────────────────────────────────────────
+const Ic = {
+  Lock:    () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+  LogOut:  () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+  Plus:    () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  Trash:   () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>,
+  Download:() => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+  Check:   () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  X:       () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  Edit:    () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  Package: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>,
+  Users:   () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  BarChart:() => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
+  Shield:  () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+  Spin:    () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spin-anim"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>,
+  Refresh: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const { useState, useEffect, useRef, useCallback } = React;
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+function csvDownload(filename, rows) {
+  const csv = rows.map(r => r.map(c => `"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([csv],{type:'text/csv'})), download: filename
+  });
+  a.click();
+}
+
+// ─── Toast ───────────────────────────────────────────────────────────────────
+let _toast = null;
+function ToastProvider({ children }) {
+  const [toasts, setToasts] = useState([]);
+  useEffect(() => {
+    _toast = (msg, type='ok') => {
+      const id = Date.now();
+      setToasts(t => [...t, {id, msg, type}]);
+      setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
+    };
+    return () => { _toast = null; };
+  }, []);
+  return (
+    <>
+      {children}
+      <div className="toast-wrap">
+        {toasts.map(t => <div key={t.id} className={`toast toast-${t.type}`}>{t.msg}</div>)}
+      </div>
+    </>
+  );
+}
+const toast = (msg, type='ok') => _toast?.(msg, type);
+
+// ─── PIN Modal ────────────────────────────────────────────────────────────────
+function PinModal({ users, onSuccess, onClose }) {
+  const [pin, setPin]   = useState('');
+  const [shake, setShake] = useState(false);
+
+  const tryPin = useCallback((p) => {
+    if (p === MASTER_PIN) { onSuccess({ name:'Master Controller', role:'master', pin:MASTER_PIN }); return; }
+    const found = users.find(u => u.pin === p);
+    if (found) { onSuccess(found); return; }
+    setShake(true);
+    setTimeout(() => { setShake(false); setPin(''); }, 500);
+  }, [users, onSuccess]);
+
+  const press = d => {
+    if (pin.length >= 4) return;
+    const next = pin + d;
+    setPin(next);
+    if (next.length === 4) setTimeout(() => tryPin(next), 120);
+  };
+
+  return (
+    <div className="overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+      <div className="modal p-6 fade-in" style={{maxWidth:320}}>
+        <div className="text-center mb-6">
+          <div style={{color:'var(--accent)',display:'flex',justifyContent:'center',marginBottom:10}}><Ic.Lock/></div>
+          <div style={{fontWeight:600,fontSize:17}}>Admin Access</div>
+          <div style={{color:'var(--text3)',fontSize:13,marginTop:4}}>Enter your 4-digit PIN</div>
+        </div>
+        <div className={`flex justify-center gap-3 mb-6 ${shake?'shake':''}`}>
+          {[0,1,2,3].map(i => <div key={i} className={`pin-dot ${pin.length>i?'filled':''}`}/>)}
+        </div>
+        <div className="numpad mb-4">
+          {[1,2,3,4,5,6,7,8,9].map(n =>
+            <button key={n} className="numpad-btn" onClick={() => press(String(n))}>{n}</button>
+          )}
+          <button className="numpad-btn" style={{fontSize:13}} onClick={() => setPin(p=>p.slice(0,-1))}>⌫</button>
+          <button className="numpad-btn" onClick={() => press('0')}>0</button>
+          <button className="numpad-btn btn-ghost" onClick={onClose} style={{fontSize:12,fontFamily:'DM Sans'}}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Checkout Modal ───────────────────────────────────────────────────────────
+function CheckoutModal({ inventory, groups, onClose }) {
+  const [itemId, setItemId] = useState('');
+  const [qty,    setQty]    = useState(1);
+  const [group,  setGroup]  = useState('');
+  const [staff,  setStaff]  = useState('');
+  const [busy,   setBusy]   = useState(false);
+
+  const selItem = inventory.find(i => i.id === itemId);
+  const avail   = selItem?.available ?? 0;
+
+  const submit = async () => {
+    if (!itemId || !group || !staff.trim()) { toast('Please fill all fields','err'); return; }
+    if (qty < 1 || qty > avail)             { toast(`Max available: ${avail}`,'err'); return; }
+    setBusy(true);
+    try {
+      // update inventory
+      const { error: e1 } = await sb.from('inventory').update({
+        available:   avail - qty,
+        checked_out: (selItem.checked_out||0) + qty,
+      }).eq('id', itemId);
+      if (e1) throw e1;
+
+      // insert transaction
+      const { error: e2 } = await sb.from('transactions').insert({
+        item_id: itemId, item_name: selItem.name,
+        quantity: qty, staff_name: staff.trim(),
+        group_name: group, status: 'out',
+        checkout_at: new Date().toISOString(),
+      });
+      if (e2) throw e2;
+
+      toast(`${qty}× ${selItem.name} checked out ✓`);
+      onClose();
+    } catch(e) { toast(e.message||'Error','err'); }
+    setBusy(false);
+  };
+
+  return (
+    <div className="overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+      <div className="modal p-6 fade-in">
+        <div className="flex items-center justify-between mb-5">
+          <div style={{fontWeight:600,fontSize:17}}>Check Out Equipment</div>
+          <button className="btn btn-ghost" style={{padding:'6px 10px'}} onClick={onClose}><Ic.X/></button>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          <div>
+            <label style={{fontSize:12,color:'var(--text3)',display:'block',marginBottom:6}}>Item Category</label>
+            <select className="inp" value={itemId} onChange={e=>{setItemId(e.target.value);setQty(1);}}>
+              <option value="">Select item…</option>
+              {inventory.filter(i=>i.available>0).map(i =>
+                <option key={i.id} value={i.id}>{i.name} ({i.available} available)</option>
+              )}
+            </select>
+          </div>
+          <div>
+            <label style={{fontSize:12,color:'var(--text3)',display:'block',marginBottom:6}}>Quantity</label>
+            <div style={{display:'flex',alignItems:'center',gap:12}}>
+              <button className="btn btn-ghost" style={{padding:'8px 14px',fontSize:18}} onClick={() => setQty(q=>Math.max(1,q-1))}>−</button>
+              <span style={{fontSize:20,fontWeight:600,minWidth:32,textAlign:'center'}} className="mono">{qty}</span>
+              <button className="btn btn-ghost" style={{padding:'8px 14px',fontSize:18}} onClick={() => setQty(q=>Math.min(avail||1,q+1))}>+</button>
+              <span style={{color:'var(--text3)',fontSize:12}}>of {avail}</span>
+            </div>
+          </div>
+          <div>
+            <label style={{fontSize:12,color:'var(--text3)',display:'block',marginBottom:6}}>Group</label>
+            <select className="inp" value={group} onChange={e=>setGroup(e.target.value)}>
+              <option value="">Select group…</option>
+              {groups.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{fontSize:12,color:'var(--text3)',display:'block',marginBottom:6}}>Personnel Name</label>
+            <input className="inp" placeholder="Full name…" value={staff} onChange={e=>setStaff(e.target.value)}/>
+          </div>
+          <button className="btn btn-success" style={{width:'100%',justifyContent:'center'}}
+            onClick={submit} disabled={busy}>
+            {busy ? <Ic.Spin/> : <Ic.Check/>} {busy?'Processing…':'Confirm Checkout'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Admin: Returns ───────────────────────────────────────────────────────────
+function ReturnsTab({ transactions, inventory, reload }) {
+  const [busy, setBusy] = useState(null);
+  const out = transactions.filter(t => t.status === 'out');
+
+  const doReturn = async (tx) => {
+    setBusy(tx.id);
+    try {
+      const inv = inventory.find(i => i.id === tx.item_id);
+      if (inv) {
+        await sb.from('inventory').update({
+          available:   inv.available   + tx.quantity,
+          checked_out: Math.max(0,(inv.checked_out||0) - tx.quantity),
+        }).eq('id', inv.id);
+      }
+      await sb.from('transactions').update({
+        status: 'returned',
+        returned_at: new Date().toISOString(),
+      }).eq('id', tx.id);
+      toast(`${tx.quantity}× ${tx.item_name} returned ✓`);
+    } catch(e) { toast(e.message||'Error','err'); }
+    setBusy(null);
+  };
+
+  if (!out.length) return (
+    <div style={{textAlign:'center',padding:50,color:'var(--text3)'}}>
+      <div style={{fontSize:32,marginBottom:8}}>✓</div>
+      <div>No outstanding checkouts</div>
+    </div>
+  );
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:10}}>
+      {out.map(t => (
+        <div key={t.id} className="card p-4 fade-in">
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:600,marginBottom:3}}>{t.item_name}</div>
+              <div style={{fontSize:12,color:'var(--text3)'}}>{t.staff_name} · {t.group_name}</div>
+              <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>{fmtDate(t.checkout_at)}</div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+              <span className="badge badge-warn mono">{t.quantity}×</span>
+              <button className="btn btn-success" style={{padding:'7px 14px'}}
+                onClick={() => doReturn(t)} disabled={busy===t.id}>
+                {busy===t.id ? <Ic.Spin/> : <Ic.Refresh/>} Return
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Admin: Inventory ─────────────────────────────────────────────────────────
+function InventoryTab({ inventory, adminUser }) {
+  const [name,    setName]    = useState('');
+  const [stock,   setStock]   = useState('');
+  const [addMode, setAddMode] = useState(false);
+  const [busy,    setBusy]    = useState(false);
+  const [delId,   setDelId]   = useState(null);
+
+  const add = async () => {
+    if (!name.trim() || stock === '') { toast('Name and stock required','err'); return; }
+    const qty = parseInt(stock,10);
+    if (isNaN(qty)||qty<0) { toast('Invalid stock','err'); return; }
+    setBusy(true);
+    try {
+      const { error } = await sb.from('inventory').insert({
+        name: name.trim(), total: qty, available: qty, checked_out: 0,
+      });
+      if (error) throw error;
+      await sb.from('stock_updates').insert({
+        action:'add_category', item_name:name.trim(), quantity:qty,
+        by_name: adminUser?.name||'Admin',
+      });
+      toast('Category added ✓');
+      setName(''); setStock(''); setAddMode(false);
+    } catch(e) { toast(e.message||'Error','err'); }
+    setBusy(false);
+  };
+
+  const del = async (id, itemName) => {
+    setDelId(id);
+    try {
+      await sb.from('inventory').delete().eq('id', id);
+      await sb.from('stock_updates').insert({
+        action:'delete_category', item_name:itemName, by_name:adminUser?.name||'Admin',
+      });
+      toast('Category deleted');
+    } catch(e) { toast(e.message||'Error','err'); }
+    setDelId(null);
+  };
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      {addMode ? (
+        <div className="card p-4 slide-down" style={{borderColor:'var(--accent)'}}>
+          <div style={{fontWeight:600,marginBottom:12,fontSize:14}}>New Category</div>
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            <input className="inp" placeholder="Category name (e.g. Radios)" value={name} onChange={e=>setName(e.target.value)}/>
+            <input className="inp" placeholder="Initial stock quantity" type="number" min="0" value={stock} onChange={e=>setStock(e.target.value)}/>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-primary" onClick={add} disabled={busy} style={{flex:1,justifyContent:'center'}}>
+                {busy?<Ic.Spin/>:<Ic.Check/>} Add
+              </button>
+              <button className="btn btn-ghost" onClick={()=>setAddMode(false)}><Ic.X/></button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <button className="btn btn-primary" onClick={()=>setAddMode(true)}><Ic.Plus/> Add Category</button>
+      )}
+      {inventory.map(item => {
+        const pct   = item.total > 0 ? (item.available/item.total*100) : 0;
+        const color = pct>50?'var(--accent2)':pct>20?'var(--warn)':'var(--danger)';
+        return (
+          <div key={item.id} className="card p-4 fade-in">
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+              <div>
+                <div style={{fontWeight:600}}>{item.name}</div>
+                <div style={{fontSize:12,color:'var(--text3)',marginTop:2}}>Total: <span className="mono">{item.total}</span></div>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <span className="badge badge-blue mono">{item.available} avail</span>
+                {item.checked_out>0 && <span className="badge badge-warn mono">{item.checked_out} out</span>}
+                <button className="btn btn-ghost" style={{padding:'6px 10px',color:'var(--danger)'}}
+                  onClick={()=>del(item.id,item.name)} disabled={delId===item.id}>
+                  {delId===item.id?<Ic.Spin/>:<Ic.Trash/>}
+                </button>
+              </div>
+            </div>
+            <div className="inv-bar"><div className="inv-bar-fill" style={{width:`${pct}%`,background:color}}/></div>
+          </div>
+        );
+      })}
+      {!inventory.length && <div style={{textAlign:'center',padding:40,color:'var(--text3)'}}>No categories yet</div>}
+    </div>
+  );
+}
+
+// ─── Admin: Groups ────────────────────────────────────────────────────────────
+function GroupsTab({ groups }) {
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [delId, setDelId] = useState(null);
+
+  const add = async () => {
+    if (!name.trim()) return;
+    setBusy(true);
+    try {
+      const { error } = await sb.from('groups').insert({ name: name.trim() });
+      if (error) throw error;
+      toast('Group added ✓'); setName('');
+    } catch(e) { toast(e.message||'Error','err'); }
+    setBusy(false);
+  };
+
+  const del = async id => {
+    setDelId(id);
+    try {
+      await sb.from('groups').delete().eq('id', id);
+      toast('Group removed');
+    } catch(e) { toast(e.message||'Error','err'); }
+    setDelId(null);
+  };
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{display:'flex',gap:8}}>
+        <input className="inp" placeholder="Group name…" value={name} onChange={e=>setName(e.target.value)}
+          onKeyDown={e=>e.key==='Enter'&&add()}/>
+        <button className="btn btn-primary" onClick={add} disabled={busy}>{busy?<Ic.Spin/>:<Ic.Plus/>}</button>
+      </div>
+      {groups.map(g => (
+        <div key={g.id} className="card p-3 fade-in" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <span style={{fontWeight:500}}>{g.name}</span>
+          <button className="btn btn-ghost" style={{padding:'6px 10px',color:'var(--danger)'}}
+            onClick={()=>del(g.id)} disabled={delId===g.id}>
+            {delId===g.id?<Ic.Spin/>:<Ic.Trash/>}
+          </button>
+        </div>
+      ))}
+      {!groups.length && <div style={{textAlign:'center',padding:40,color:'var(--text3)'}}>No groups yet</div>}
+    </div>
+  );
+}
+
+// ─── Admin: Reports ───────────────────────────────────────────────────────────
+function ReportsTab({ transactions, stockUpdates }) {
+  const [tab, setTab] = useState('flows');
+
+  const exportFlows = () => {
+    csvDownload('staff_flows.csv', [
+      ['Item','Quantity','Staff','Group','Status','Checked Out','Returned'],
+      ...transactions.map(t => [t.item_name,t.quantity,t.staff_name,t.group_name,t.status,fmtDate(t.checkout_at),fmtDate(t.returned_at)]),
+    ]);
+  };
+  const exportAudit = () => {
+    csvDownload('system_audit.csv', [
+      ['Action','Item','Quantity','By','Time'],
+      ...stockUpdates.map(u => [u.action,u.item_name,u.quantity||'',u.by_name,fmtDate(u.created_at)]),
+    ]);
+  };
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{display:'flex',gap:2,background:'var(--surface2)',padding:3,borderRadius:10}}>
+        {[['flows','Staff Flows'],['audit','System Audit']].map(([id,label]) => (
+          <button key={id}
+            style={{flex:1,padding:'8px',borderRadius:8,fontSize:13,fontWeight:500,cursor:'pointer',
+              background:tab===id?'var(--surface)':'transparent',
+              color:tab===id?'var(--text)':'var(--text3)',border:'none',
+              fontFamily:'DM Sans',transition:'all .15s',
+              boxShadow:tab===id?'0 1px 4px rgba(0,0,0,.3)':'none'}}
+            onClick={()=>setTab(id)}>{label}</button>
+        ))}
+      </div>
+
+      {tab==='flows' && <>
+        <button className="btn btn-ghost" onClick={exportFlows} style={{alignSelf:'flex-end'}}><Ic.Download/> Export CSV</button>
+        <div className="card" style={{overflowX:'auto'}}>
+          <table className="tbl">
+            <thead><tr><th>Item</th><th>Qty</th><th>Staff</th><th>Group</th><th>Status</th><th>Date</th></tr></thead>
+            <tbody>
+              {[...transactions].reverse().map(t => (
+                <tr key={t.id}>
+                  <td style={{color:'var(--text)'}}>{t.item_name}</td>
+                  <td><span className="badge badge-blue mono">{t.quantity}</span></td>
+                  <td>{t.staff_name}</td><td>{t.group_name}</td>
+                  <td><span className={`badge ${t.status==='out'?'badge-warn':'badge-green'}`}>{t.status}</span></td>
+                  <td style={{fontSize:12}}>{fmtDate(t.checkout_at)}</td>
+                </tr>
+              ))}
+              {!transactions.length && <tr><td colSpan={6} style={{textAlign:'center',padding:30}}>No records</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </>}
+
+      {tab==='audit' && <>
+        <button className="btn btn-ghost" onClick={exportAudit} style={{alignSelf:'flex-end'}}><Ic.Download/> Export CSV</button>
+        <div className="card" style={{overflowX:'auto'}}>
+          <table className="tbl">
+            <thead><tr><th>Action</th><th>Item</th><th>Qty</th><th>By</th><th>Time</th></tr></thead>
+            <tbody>
+              {[...stockUpdates].reverse().map((u,i) => (
+                <tr key={i}>
+                  <td><span className="badge badge-blue">{u.action}</span></td>
+                  <td style={{color:'var(--text)'}}>{u.item_name}</td>
+                  <td className="mono">{u.quantity||'—'}</td><td>{u.by_name}</td>
+                  <td style={{fontSize:12}}>{fmtDate(u.created_at)}</td>
+                </tr>
+              ))}
+              {!stockUpdates.length && <tr><td colSpan={5} style={{textAlign:'center',padding:30}}>No records</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </>}
+    </div>
+  );
+}
+
+// ─── Admin: Team (Master only) ────────────────────────────────────────────────
+function TeamTab({ users }) {
+  const [editId,   setEditId]   = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editPin,  setEditPin]  = useState('');
+  const [editRole, setEditRole] = useState('admin');
+  const [addMode,  setAddMode]  = useState(false);
+  const [nName,    setNName]    = useState('');
+  const [nPin,     setNPin]     = useState('');
+  const [nRole,    setNRole]    = useState('admin');
+  const [busy,     setBusy]     = useState(false);
+
+  const add = async () => {
+    if (!nName.trim()||!/^\d{4}$/.test(nPin)) { toast('Name + 4-digit PIN required','err'); return; }
+    setBusy(true);
+    try {
+      const { error } = await sb.from('users').insert({
+        name:nName.trim(), pin:nPin, role:nRole,
+        idx: users.length ? Math.max(...users.map(u=>u.idx||0))+1 : 0,
+      });
+      if (error) throw error;
+      toast('Admin added ✓'); setAddMode(false); setNName(''); setNPin(''); setNRole('admin');
+    } catch(e) { toast(e.message||'Error','err'); }
+    setBusy(false);
+  };
+
+  const save = async id => {
+    if (!editName.trim()||!/^\d{4}$/.test(editPin)) { toast('Name + 4-digit PIN required','err'); return; }
+    setBusy(true);
+    try {
+      const { error } = await sb.from('users').update({name:editName,pin:editPin,role:editRole}).eq('id',id);
+      if (error) throw error;
+      toast('Updated ✓'); setEditId(null);
+    } catch(e) { toast(e.message||'Error','err'); }
+    setBusy(false);
+  };
+
+  const del = async id => {
+    setBusy(true);
+    try {
+      await sb.from('users').delete().eq('id',id);
+      toast('Admin removed');
+    } catch(e) { toast(e.message||'Error','err'); }
+    setBusy(false);
+  };
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div className="card p-3" style={{borderColor:'rgba(79,142,247,.3)',background:'rgba(79,142,247,.05)'}}>
+        <div style={{fontSize:12,color:'var(--text2)'}}>
+          <strong style={{color:'var(--accent)'}}>Master Override</strong> — PIN <span className="mono">1234</span> always grants master access regardless of DB state.
+        </div>
+      </div>
+
+      {addMode ? (
+        <div className="card p-4 slide-down" style={{borderColor:'var(--accent)'}}>
+          <div style={{fontWeight:600,marginBottom:12}}>New Admin</div>
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            <input className="inp" placeholder="Name" value={nName} onChange={e=>setNName(e.target.value)}/>
+            <input className="inp" placeholder="4-digit PIN" maxLength={4} value={nPin}
+              onChange={e=>setNPin(e.target.value.replace(/\D/g,'').slice(0,4))}/>
+            <select className="inp" value={nRole} onChange={e=>setNRole(e.target.value)}>
+              <option value="admin">Admin</option>
+              <option value="master">Master</option>
+            </select>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-primary" onClick={add} disabled={busy} style={{flex:1,justifyContent:'center'}}>
+                {busy?<Ic.Spin/>:<Ic.Check/>} Add
+              </button>
+              <button className="btn btn-ghost" onClick={()=>setAddMode(false)}><Ic.X/></button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <button className="btn btn-primary" onClick={()=>setAddMode(true)}><Ic.Plus/> Add Admin</button>
+      )}
+
+      {[...users].sort((a,b)=>(a.idx||0)-(b.idx||0)).map(u => (
+        <div key={u.id} className="card p-4 fade-in">
+          {editId===u.id ? (
+            <div style={{display:'flex',flexDirection:'column',gap:10}}>
+              <input className="inp" value={editName} onChange={e=>setEditName(e.target.value)} placeholder="Name"/>
+              <input className="inp" value={editPin}  maxLength={4}
+                onChange={e=>setEditPin(e.target.value.replace(/\D/g,'').slice(0,4))} placeholder="PIN"/>
+              <select className="inp" value={editRole} onChange={e=>setEditRole(e.target.value)}>
+                <option value="admin">Admin</option>
+                <option value="master">Master</option>
+              </select>
+              <div style={{display:'flex',gap:8}}>
+                <button className="btn btn-primary" onClick={()=>save(u.id)} disabled={busy} style={{flex:1,justifyContent:'center'}}>
+                  {busy?<Ic.Spin/>:<Ic.Check/>} Save
+                </button>
+                <button className="btn btn-ghost" onClick={()=>setEditId(null)}><Ic.X/></button>
+              </div>
+            </div>
+          ) : (
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div>
+                <div style={{fontWeight:600}}>{u.name}</div>
+                <div style={{fontSize:12,color:'var(--text3)',marginTop:2}}>
+                  PIN: <span className="mono">••••</span> · <span className={`badge ${u.role==='master'?'badge-blue':'badge-green'}`}>{u.role}</span>
+                </div>
+              </div>
+              <div style={{display:'flex',gap:6}}>
+                <button className="btn btn-ghost" style={{padding:'6px 10px'}}
+                  onClick={()=>{setEditId(u.id);setEditName(u.name);setEditPin(u.pin);setEditRole(u.role);}}>
+                  <Ic.Edit/>
+                </button>
+                <button className="btn btn-ghost" style={{padding:'6px 10px',color:'var(--danger)'}}
+                  onClick={()=>del(u.id)} disabled={busy}><Ic.Trash/></button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+      {!users.length && <div style={{textAlign:'center',padding:40,color:'var(--text3)'}}>No admins configured</div>}
+    </div>
+  );
+}
+
+// ─── Admin Console ────────────────────────────────────────────────────────────
+function AdminConsole({ adminUser, inventory, groups, transactions, stockUpdates, users, onLogout }) {
+  const isMaster = adminUser?.role === 'master';
+  const tabs = [
+    {id:'returns',   label:'Returns',   icon:<Ic.Refresh/>},
+    {id:'inventory', label:'Inventory', icon:<Ic.Package/>},
+    {id:'groups',    label:'Groups',    icon:<Ic.Users/>},
+    {id:'reports',   label:'Reports',   icon:<Ic.BarChart/>},
+    ...(isMaster ? [{id:'team',label:'Team',icon:<Ic.Shield/>}] : []),
+  ];
+  const [tab, setTab] = useState('returns');
+
+  return (
+    <div style={{maxWidth:600,margin:'0 auto',padding:'0 16px 80px'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 0 16px',borderBottom:'1px solid var(--border)',marginBottom:16}}>
+        <div>
+          <div style={{fontSize:13,color:'var(--text3)'}}>Signed in as</div>
+          <div style={{fontWeight:600}}>{adminUser?.name}</div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span className={`badge ${isMaster?'badge-blue':'badge-green'}`}>{adminUser?.role}</span>
+          <button className="btn btn-ghost" style={{padding:'7px 12px'}} onClick={onLogout}><Ic.LogOut/></button>
+        </div>
+      </div>
+
+      <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4,marginBottom:16,scrollbarWidth:'none'}}>
+        {tabs.map(t => (
+          <button key={t.id}
+            className={`btn ${tab===t.id?'btn-primary':'btn-ghost'}`}
+            style={{flexShrink:0,padding:'8px 14px',fontSize:13}}
+            onClick={()=>setTab(t.id)}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab==='returns'   && <ReturnsTab   transactions={transactions} inventory={inventory}/>}
+      {tab==='inventory' && <InventoryTab inventory={inventory} adminUser={adminUser}/>}
+      {tab==='groups'    && <GroupsTab    groups={groups}/>}
+      {tab==='reports'   && <ReportsTab   transactions={transactions} stockUpdates={stockUpdates}/>}
+      {tab==='team'      && isMaster && <TeamTab users={users}/>}
+    </div>
+  );
+}
+
+// ─── Public Portal ────────────────────────────────────────────────────────────
+function PublicPortal({ inventory, onCheckout }) {
+  const total     = inventory.reduce((s,i)=>s+i.total,0);
+  const available = inventory.reduce((s,i)=>s+i.available,0);
+  const out       = inventory.reduce((s,i)=>s+(i.checked_out||0),0);
+
+  return (
+    <div style={{maxWidth:600,margin:'0 auto',padding:'0 16px 80px'}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:20}}>
+        {[
+          {label:'Total Items', value:total,     cls:'badge-blue'},
+          {label:'Available',   value:available,  cls:'badge-green'},
+          {label:'Checked Out', value:out,        cls:'badge-warn'},
+        ].map(s => (
+          <div key={s.label} className="card p-3 text-center fade-in">
+            <div className={`badge ${s.cls}`} style={{fontSize:18,padding:'4px 0',display:'block',marginBottom:4}}>{s.value}</div>
+            <div style={{fontSize:11,color:'var(--text3)'}}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:20}}>
+        {inventory.map(item => {
+          const pct   = item.total>0?(item.available/item.total*100):0;
+          const color = pct>50?'var(--accent2)':pct>20?'var(--warn)':'var(--danger)';
+          return (
+            <div key={item.id} className="card p-4 fade-in">
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  <span style={{color:'var(--accent)'}}><Ic.Package/></span>
+                  <span style={{fontWeight:600}}>{item.name}</span>
+                </div>
+                <span className="badge badge-blue mono">{item.available} / {item.total}</span>
+              </div>
+              <div className="inv-bar"><div className="inv-bar-fill" style={{width:`${pct}%`,background:color}}/></div>
+            </div>
+          );
+        })}
+        {!inventory.length && (
+          <div style={{textAlign:'center',padding:60,color:'var(--text3)'}}>No inventory configured yet.</div>
+        )}
+      </div>
+
+      <div style={{position:'fixed',bottom:24,left:0,right:0,display:'flex',justifyContent:'center',pointerEvents:'none'}}>
+        <button className="btn btn-success"
+          style={{fontSize:16,padding:'14px 36px',borderRadius:40,boxShadow:'0 8px 30px rgba(56,217,169,.3)',pointerEvents:'all'}}
+          onClick={onCheckout}>
+          Check Out Equipment
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── App Root ─────────────────────────────────────────────────────────────────
+function App() {
+  const [ready,        setReady]       = useState(false);
+  const [inventory,    setInventory]   = useState([]);
+  const [groups,       setGroups]      = useState([]);
+  const [transactions, setTransactions]= useState([]);
+  const [stockUpdates, setStockUpdates]= useState([]);
+  const [users,        setUsers]       = useState([]);
+
+  const [adminUser,    setAdminUser]   = useState(null);
+  const [view,         setView]        = useState('public');
+  const [showPin,      setShowPin]     = useState(false);
+  const [showCheckout, setShowCheckout]= useState(false);
+
+  // ── Initial fetch ──────────────────────────────────────────────────────────
+  const fetchAll = async () => {
+    try {
+      const [inv, grp, txn, aud, usr] = await Promise.all([
+        sb.from('inventory').select('*').order('created_at'),
+        sb.from('groups').select('*').order('created_at'),
+        sb.from('transactions').select('*').order('checkout_at'),
+        sb.from('stock_updates').select('*').order('created_at'),
+        sb.from('users').select('*').order('idx'),
+      ]);
+      if (inv.data) setInventory(inv.data);
+      if (grp.data) setGroups(grp.data);
+      if (txn.data) setTransactions(txn.data);
+      if (aud.data) setStockUpdates(aud.data);
+      if (usr.data) setUsers(usr.data);
+    } catch(e) { console.warn('Fetch error:', e); }
+    setReady(true);
+  };
+
+  // ── Realtime subscriptions ─────────────────────────────────────────────────
+  useEffect(() => {
+    fetchAll();
+
+    const tables = [
+      { table:'inventory',    setter: setInventory,   order:'created_at' },
+      { table:'groups',       setter: setGroups,      order:'created_at' },
+      { table:'transactions', setter: setTransactions,order:'checkout_at' },
+      { table:'stock_updates',setter: setStockUpdates,order:'created_at' },
+      { table:'users',        setter: setUsers,       order:'idx' },
+    ];
+
+    const subs = tables.map(({ table, setter, order }) =>
+      sb.channel(`rt-${table}`)
+        .on('postgres_changes', { event:'*', schema:'public', table }, async () => {
+          const { data } = await sb.from(table).select('*').order(order);
+          if (data) setter(data);
+        })
+        .subscribe()
+    );
+
+    return () => { subs.forEach(s => sb.removeChannel(s)); };
+  }, []);
+
+  const handlePinSuccess = user => {
+    setAdminUser(user);
+    setShowPin(false);
+    setView('admin');
+    toast(`Welcome, ${user.name}`, 'info');
+  };
+
+  const handleLogout = () => {
+    setAdminUser(null);
+    setView('public');
+    toast('Signed out');
+  };
+
+  if (!ready) return (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',flexDirection:'column',gap:14}}>
+      <Ic.Spin/>
+      <div style={{color:'var(--text3)',fontSize:13}}>Connecting to Supabase…</div>
+    </div>
+  );
+
+  return (
+    <ToastProvider>
+      {/* Header */}
+      <div className="header-stripe" style={{padding:'14px 16px'}}>
+        <div style={{maxWidth:600,margin:'0 auto',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div>
+            <div style={{fontWeight:700,fontSize:16,letterSpacing:'-0.02em'}}>BGI London</div>
+            <div style={{fontSize:11,color:'var(--text3)',fontFamily:'DM Mono',marginTop:1}}>Inventory Tracker</div>
+          </div>
+          <button className="btn btn-ghost" style={{padding:'7px 12px'}} onClick={()=>setShowPin(true)} title="Admin login">
+            <Ic.Lock/>
+          </button>
+        </div>
+      </div>
+
+      {/* Tab nav */}
+      <div style={{background:'var(--surface)',borderBottom:'1px solid var(--border)'}}>
+        <div style={{maxWidth:600,margin:'0 auto',padding:'10px 16px 0',display:'flex',gap:0}}>
+          <button
+            className="tab-nav-btn"
+            onClick={()=>setView('public')}
+            style={{
+              color:view==='public'?'var(--text)':'var(--text3)',
+              fontWeight:view==='public'?600:400,
+              borderBottomColor:view==='public'?'var(--accent)':'transparent',
+            }}>
+            Overview
+          </button>
+          {adminUser && (
+            <button
+              className="tab-nav-btn"
+              onClick={()=>setView('admin')}
+              style={{
+                color:view==='admin'?'var(--text)':'var(--text3)',
+                fontWeight:view==='admin'?600:400,
+                borderBottomColor:view==='admin'?'var(--accent)':'transparent',
+              }}>
+              Admin Console
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div style={{paddingTop:20}}>
+        {view==='admin' && adminUser
+          ? <AdminConsole
+              adminUser={adminUser} inventory={inventory} groups={groups}
+              transactions={transactions} stockUpdates={stockUpdates}
+              users={users} onLogout={handleLogout}
+            />
+          : <PublicPortal inventory={inventory} onCheckout={()=>setShowCheckout(true)}/>
+        }
+      </div>
+
+      {showPin && (
+        <PinModal users={users} onSuccess={handlePinSuccess} onClose={()=>setShowPin(false)}/>
+      )}
+      {showCheckout && (
+        <CheckoutModal inventory={inventory} groups={groups} onClose={()=>setShowCheckout(false)}/>
+      )}
+    </ToastProvider>
+  );
+}
+
+ReactDOM.render(<App/>, document.getElementById('root'));
+</script>
+</body>
+</html>
